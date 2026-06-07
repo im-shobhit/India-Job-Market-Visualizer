@@ -1,0 +1,31 @@
+# India Job Market Visualizer — Python Dependencies
+# Install with: pip install -r requirements.txt
+# Python 3.13 | Windows 11 | VS Code
+
+# Dashboard framework
+streamlit==1.45.1
+
+# Visualizations
+plotly==6.1.1
+
+# Data processing
+pandas==2.2.3
+numpy==2.2.3
+
+# Machine learning (Salary Predictor)
+scikit-learn==1.6.1
+
+# HTTP requests (data collection)
+requests==2.32.3
+
+# HTML parsing (optional scraping)
+beautifulsoup4==4.13.4
+
+# Environment variables
+python-dotenv==1.1.0
+
+# Excel file support (some Kaggle datasets are .xlsx)
+openpyxl==3.1.5
+
+# Date parsing utilities
+python-dateutil==2.9.0

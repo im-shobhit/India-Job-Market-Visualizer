@@ -1,0 +1,61 @@
+# ==============================================
+# India Job Market Visualizer — .gitignore
+# ==============================================
+
+# Virtual environment — never commit this
+venv/
+.venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Raw data — too large for Git, contains personal/scraped data
+data/raw/
+data/processed/
+
+# Database file — binary, not suitable for Git
+data/*.db
+data/*.sqlite
+
+# Trained ML models — large binary files
+models/*.pkl
+models/*.joblib
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Environment variables — may contain API keys
+.env
+.env.local
+
+# VS Code settings — machine-specific
+.vscode/
+*.code-workspace
+
+# Windows system files
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# macOS system files (if collaborating with Mac users)
+.DS_Store
+.AppleDouble
+
+# Streamlit cache
+.streamlit/cache/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
