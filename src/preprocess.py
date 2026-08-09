@@ -91,6 +91,11 @@ CITY_ALIASES = {
     "nagpur"         : "Nagpur",
     "visakhapatnam"  : "Visakhapatnam",
     "vizag"          : "Visakhapatnam",
+    "bengaluru/bangalore" : "Bengaluru",
+    "bangalore/bengaluru" : "Bengaluru",
+    "delhi/ncr"           : "Delhi NCR",
+    "ncr"                 : "Delhi NCR",
+    "mumbai/pune"         : "Mumbai",
 }
 
 # ---------------------------------------------------------------------------
@@ -311,9 +316,9 @@ def get_canonical_title(raw: str) -> str:
     for keyword, canonical in TITLE_CANONICAL.items():
         if keyword in raw_lower:
             return canonical
-    cleaned = re.sub(r"\(.*?\)", "", str(raw))
-    cleaned = re.sub(r"[^a-zA-Z\s/]", "", cleaned).strip().title()
-    return cleaned[:40] if cleaned else "Other"
+
+
+    return "Other"
 
 
 def normalise_education(raw: str) -> str:
@@ -405,19 +410,63 @@ def normalise_education(raw: str) -> str:
 
     return "Unknown"
 
-def clean_skills(raw: str) -> str:
-    """Clean and normalise skills_raw into pipe-separated string."""
-    if pd.isna(raw) or not str(raw).strip():
-        return ""
-    skills = re.split(r"[,;/\n|]+", str(raw))
-    cleaned = []
+# Master list of skills to look for in job descriptions
+SKILL_KEYWORDS = [
+    "python", "sql", "excel", "power bi", "tableau", "r ", "scala",
+    "java", "javascript", "typescript", "react", "angular", "node.js",
+    "aws", "azure", "gcp", "docker", "kubernetes", "linux", "git",
+    "machine learning", "deep learning", "nlp", "tensorflow", "pytorch",
+    "scikit-learn", "pandas", "numpy", "spark", "hadoop", "hive",
+    "kafka", "airflow", "dbt", "snowflake", "redshift", "bigquery",
+    "mongodb", "postgresql", "mysql", "oracle", "redis",
+    "power apps", "power automate", "looker", "qlik",
+    "c++", "c#", ".net", "php", "django", "flask", "fastapi",
+    "selenium", "jira", "agile", "scrum", "rest api", "graphql",
+    "photoshop", "figma", "tally", "sap", "salesforce", "hubspot",
+    "communication", "leadership", "ms office", "google analytics",
+]
+
+def clean_skills(raw: str, description: str = "") -> str:
+    """
+    Extract skills by scanning the job_description for known skill keywords.
+    Falls back to cleaning skills_raw if description is empty.
+
+    This approach works better for this dataset where skills_raw contains
+    industry categories (ITES, Marketing) rather than specific skills.
+    """
+    found = []
     seen = set()
-    for s in skills:
-        s = re.sub(r"\s+", " ", s.strip()).strip().title()
-        if 2 <= len(s) <= 50 and s.lower() not in seen:
-            seen.add(s.lower())
-            cleaned.append(s)
-    return "|".join(cleaned)
+
+    # Primary: scan job description for known skill keywords
+    text = str(description).lower() if not pd.isna(description) else ""
+
+    for skill in SKILL_KEYWORDS:
+        # Use word boundary check to avoid partial matches
+        pattern = r"\b" + re.escape(skill) + r"\b"
+        if re.search(pattern, text):
+            display = skill.strip().title()
+            if display.lower() not in seen:
+                seen.add(display.lower())
+                found.append(display)
+
+    # Fallback: also include anything from skills_raw that looks like
+    # a real skill (not just an industry category)
+    if not pd.isna(raw):
+        raw_parts = re.split(r"[,;|\n]+", str(raw))
+        for part in raw_parts:
+            part = part.strip().title()
+            # Only include if it looks like a specific skill (not generic)
+            if 2 <= len(part) <= 30 and part.lower() not in seen:
+                # Skip obvious industry categories
+                skip = ["ites", "it software", "it hardware", "bpo",
+                        "accounts", "marketing", "sales", "banking",
+                        "finance", "insurance", "pharma", "retail",
+                        "telecom", "media", "engineering", "fmcg"]
+                if not any(s in part.lower() for s in skip):
+                    seen.add(part.lower())
+                    found.append(part)
+
+    return "|".join(found[:15])  # cap at 15 skills per job
 
 
 def normalise_date(raw: str) -> str:
@@ -497,9 +546,12 @@ def run_cleaning() -> pd.DataFrame:
     log.info("Normalising education...")
     df["education"] = df["education"].apply(normalise_education)
 
-    # 6. Skills
+    # 6. Skills — extract from job_description using keyword matching
     log.info("Cleaning skills...")
-    df["skills"] = df["skills_raw"].apply(clean_skills)
+    df["skills"] = df.apply(
+        lambda row: clean_skills(row["skills_raw"], row["job_description"]),
+        axis=1
+    )
 
     # 7. Dates
     log.info("Normalising dates...")
