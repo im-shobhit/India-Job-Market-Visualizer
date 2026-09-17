@@ -1,25 +1,24 @@
 """
 pages/1_overview.py
 ====================
-Phase 8 — Dashboard Core: Overview Page
+Phase 8 -- Dashboard Core: Overview Page
 
 The hub page. Entry point for all users.
 Tells the complete Indian job market story in one screen.
 
 Layout (top to bottom):
     1. Page config + dark theme CSS injection
-    2. Header bar with title and last-updated
-    3. KPI strip — 4 metric cards
-    4. Outlook distribution row — 3 compact charts
-    5. Treemap hero — full width, interactive
-    6. Snapshot row — 3 mini charts with explore links
-    7. Bottom filter bar
+    2. Hero header bar with brand, live badge, job count
+    3. KPI strip -- 4 metric cards
+    4. Outlook distribution row -- 3 compact charts
+    5. Treemap hero -- full width, interactive
+    6. Snapshot row -- 3 mini charts with explore links
+    7. Sidebar filters (collapsed by default)
 
 Author : India Job Market Visualizer
-Phase  : 8 — Dashboard Core
+Phase  : 8 -- Dashboard Core
 """
 
-import sqlite3
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -35,121 +34,180 @@ from app.components.data_loader import (
 )
 
 # ---------------------------------------------------------------------------
-# Page configuration — must be the FIRST Streamlit call
+# Page configuration -- must be the FIRST Streamlit call
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title  = "India Job Market Visualizer",
-    page_icon   = "📊",
-    layout      = "wide",
-    initial_sidebar_state = "collapsed",
+    page_title="India Job Market Visualizer",
+    page_icon="chart_with_upwards_trend",
+    layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
 # ---------------------------------------------------------------------------
-# Dark theme CSS — injects custom styles into the Streamlit app
+# CSS -- all plain ASCII, no unicode dashes in comments
 # ---------------------------------------------------------------------------
-st.markdown("""
+DARK_CSS = """
 <style>
-/* Hide Streamlit default header and footer */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
 
-/* Page background */
-.stApp {background-color: #0f1117;}
+/* hide default streamlit chrome */
+#MainMenu {visibility: hidden !important;}
+footer    {visibility: hidden !important;}
+header    {visibility: hidden !important;}
+.stDeployButton {display: none !important;}
 
-/* Remove default padding */
-.block-container {
-    padding-top: 1rem;
-    padding-bottom: 0rem;
-    padding-left: 2rem;
-    padding-right: 2rem;
+/* hide the default arrow sidebar toggle completely */
+[data-testid="collapsedControl"] {
+    display: none !important;
+    visibility: hidden !important;
 }
 
-/* KPI card styling */
+/* page background and content area */
+.stApp {background-color: #0f1117;}
+.block-container {
+    padding-top: 0rem !important;
+    padding-bottom: 1rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    max-width: 100% !important;
+}
+
+/* HERO BAR: 3 equal columns - hamburger | centre title | right meta */
+.hero-bar {
+    background: linear-gradient(135deg, #0d1014 0%, #161922 60%, #0F2A20 100%);
+    border-bottom: 0.5px solid rgba(29,158,117,0.3);
+    padding: 0 28px;
+    height: 64px;
+    width: calc(100% + 4rem);
+    margin: 0 -2rem 1.5rem -2rem;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-items: center;
+}
+
+/* Left col: hamburger button */
+.hbg {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 0;
+    border-radius: 6px;
+}
+.hbg:hover {background: rgba(255,255,255,0.07);}
+.hml {
+    width: 20px;
+    height: 2px;
+    background: #888780;
+    border-radius: 2px;
+    display: block;
+    transition: background 0.15s;
+}
+.hbg:hover .hml {background: #e8e6de;}
+
+/* Centre col: brand (icon + title + subtitle) - perfectly centred */
+.hero-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-align: left;
+}
+.hero-icon {
+    width: 36px; height: 36px; flex-shrink: 0;
+    background: linear-gradient(135deg, #1D9E75 0%, #0F6E56 100%);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+}
+.hero-title {
+    font-size: 18px; font-weight: 700; color: #e8e6de;
+    letter-spacing: -0.3px; line-height: 1.1; margin: 0;
+}
+.hero-subtitle {font-size: 11px; color: #5F5E5A; margin: 2px 0 0 0;}
+
+/* Right col: live badge + count - right-aligned */
+.hero-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 5px;
+}
+.hero-live-badge {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: #5DCAA5;
+    background: rgba(29,158,117,0.12);
+    border: 0.5px solid rgba(29,158,117,0.3);
+    border-radius: 20px; padding: 3px 10px;
+}
+.hero-live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #5DCAA5;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%   {opacity: 1;}
+    50%  {opacity: 0.3;}
+    100% {opacity: 1;}
+}
+.hero-count {font-size: 11px; color: #5F5E5A; white-space: nowrap;}
+
+/* kpi cards */
 .kpi-card {
     background: #161922;
     border: 0.5px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    padding: 14px 16px;
+    border-radius: 8px; padding: 14px 16px;
 }
 .kpi-label {
-    font-size: 11px;
-    color: #5F5E5A;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 11px; color: #5F5E5A; margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.05em;
 }
-.kpi-value {
-    font-size: 28px;
-    font-weight: 600;
-    color: #e8e6de;
-    line-height: 1;
-}
+.kpi-value {font-size: 28px; font-weight: 600; color: #e8e6de; line-height: 1;}
 .kpi-delta-up   {font-size: 11px; color: #5DCAA5; margin-top: 4px;}
 .kpi-delta-down {font-size: 11px; color: #F09595; margin-top: 4px;}
 .kpi-delta-neu  {font-size: 11px; color: #FAC775; margin-top: 4px;}
 
-/* Section labels */
-.section-label {
-    font-size: 11px;
-    color: #5F5E5A;
-    margin-bottom: 6px;
-    letter-spacing: 0.03em;
-}
+/* section labels */
+.section-label {font-size: 11px; color: #5F5E5A; margin-bottom: 6px; letter-spacing: 0.03em;}
 
-/* Explore link */
-.explore-link {
-    font-size: 11px;
-    color: #1D9E75;
-    text-align: right;
-}
+/* explore links */
+.explore-link {font-size: 11px; color: #1D9E75; text-align: right;}
 
-/* Divider */
-.h-rule {
-    border: none;
-    border-top: 0.5px solid rgba(255,255,255,0.07);
-    margin: 8px 0;
-}
 </style>
-""", unsafe_allow_html=True)
+"""
+
+st.markdown(DARK_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Color constants — frozen design system tokens
+# Color tokens
 # ---------------------------------------------------------------------------
-COLORS = {
+C = {
     "very_fast" : "#0F6E56",
     "growing"   : "#1D9E75",
     "stable"    : "#BA7517",
     "slowing"   : "#993C1D",
     "declining" : "#A32D2D",
-    "bg_card"   : "#161922",
-    "bg_page"   : "#0f1117",
-    "text_main" : "#e8e6de",
-    "text_muted": "#5F5E5A",
 }
 
-PLOTLY_CONFIG = {
-    "displayModeBar": False,
-    "responsive": True,
-}
-
-CHART_BG = dict(
-    plot_bgcolor  = "#161922",
-    paper_bgcolor = "#161922",
-    font_color    = "#e8e6de",
-)
+PLOTLY_CFG = {"displayModeBar": False, "responsive": True}
+CHART_BG   = dict(plot_bgcolor="#161922", paper_bgcolor="#161922", font_color="#e8e6de")
 
 
-def growth_color(score: float) -> str:
-    """Map a growth_score to the frozen color token."""
-    if score > 20:   return COLORS["very_fast"]
-    if score > 5:    return COLORS["growing"]
-    if score > -5:   return COLORS["stable"]
-    if score > -20:  return COLORS["slowing"]
-    return COLORS["declining"]
+def growth_color(score):
+    if score > 20:  return C["very_fast"]
+    if score > 5:   return C["growing"]
+    if score > -5:  return C["stable"]
+    if score > -20: return C["slowing"]
+    return C["declining"]
 
 
-def growth_label(score: float) -> str:
+def growth_label(score):
     if score > 20:  return "Very fast growth"
     if score > 5:   return "Growing"
     if score > -5:  return "Stable"
@@ -160,15 +218,15 @@ def growth_label(score: float) -> str:
 # ===========================================================================
 # LOAD DATA
 # ===========================================================================
-kpi        = load_kpi()
-role_stats = load_role_stats()
+kpi         = load_kpi()
+role_stats  = load_role_stats()
 skill_stats = load_skill_stats()
 city_stats  = load_city_stats()
 jobs_df     = load_jobs()
 filter_opts = get_filter_options(jobs_df)
 
 # ===========================================================================
-# SIDEBAR FILTERS (collapsed by default on Overview)
+# SIDEBAR FILTERS (collapsed by default)
 # ===========================================================================
 with st.sidebar:
     st.markdown("### Filters")
@@ -179,14 +237,16 @@ with st.sidebar:
 
 filtered_df = apply_filters(
     jobs_df,
-    city=sel_city,
-    industry=sel_industry,
-    work_mode=sel_mode,
-    experience=sel_exp,
+    city=sel_city, industry=sel_industry,
+    work_mode=sel_mode, experience=sel_exp,
 )
 
-# Recompute role stats from filtered data if filters are active
-if sel_city != "All" or sel_industry != "All" or sel_mode != "All" or sel_exp != "Any":
+filters_active = (
+    sel_city != "All" or sel_industry != "All"
+    or sel_mode != "All" or sel_exp != "Any"
+)
+
+if filters_active:
     filtered_roles = (
         filtered_df
         .groupby("job_title_canonical")
@@ -199,122 +259,128 @@ else:
 
 
 # ===========================================================================
-# HEADER
+# HERO HEADER
 # ===========================================================================
-col_title, col_meta = st.columns([3, 1])
-with col_title:
-    st.markdown(
-        "<h2 style='color:#e8e6de;margin:0;font-size:20px;font-weight:600;'>"
-        "📊 India Job Market Overview</h2>",
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        "<p style='color:#5F5E5A;font-size:12px;margin:2px 0 0 0;'>"
-        "Tech &amp; all sectors · Live data from Naukri.com</p>",
-        unsafe_allow_html=True
-    )
-with col_meta:
-    st.markdown(
-        "<p style='color:#5F5E5A;font-size:11px;text-align:right;margin-top:8px;'>"
-        f"Showing {len(filtered_df):,} jobs</p>",
-        unsafe_allow_html=True
-    )
+# The hamburger button uses Streamlit's component HTML trick to
+# call the real sidebar toggle button which is hidden beneath.
+_hero = (
+    '<div class="hero-bar">'
 
-st.markdown("<hr class='h-rule'>", unsafe_allow_html=True)
+    # Left col: hamburger (onclick finds and clicks the hidden Streamlit toggle)
+    '<div></div>'
 
+    # Centre col: icon + title + subtitle (centred by grid)
+    '<div class="hero-brand">'
+    '<div class="hero-icon">&#128202;</div>'
+    '<div>'
+    '<p class="hero-title">India Job Market Visualizer</p>'
+    '<p class="hero-subtitle">Tech &amp; all sectors &nbsp;&middot;&nbsp; Live data from Naukri.com</p>'
+    '</div>'
+    '</div>'
+
+    # Right col: live badge stacked above job count
+    '<div class="hero-right">'
+    '<div class="hero-live-badge"><div class="hero-live-dot"></div>&#11044; Live</div>'
+    f'<span class="hero-count">Q2 2025 &nbsp;&middot;&nbsp; {len(filtered_df):,} active jobs</span>'
+    '</div>'
+
+    '</div>'
+)
+st.markdown(_hero, unsafe_allow_html=True)
+
+# restore inner padding for content below the hero bar
+st.markdown(
+    '<style>.block-container{padding-left:2rem !important;padding-right:2rem !important;}</style>',
+    unsafe_allow_html=True,
+)
 
 # ===========================================================================
-# KPI STRIP — 4 cards
+# KPI STRIP
 # ===========================================================================
 k1, k2, k3, k4 = st.columns(4)
 
 with k1:
-    st.markdown(f"""
-    <div class='kpi-card'>
-        <div class='kpi-label'>Total active jobs</div>
-        <div class='kpi-value'>{kpi['total_jobs']:,}</div>
-        <div class='kpi-delta-up'>↑ Full dataset</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="kpi-card">'
+        f'<div class="kpi-label">Total active jobs</div>'
+        f'<div class="kpi-value">{kpi["total_jobs"]:,}</div>'
+        f'<div class="kpi-delta-up">&#8593; Full dataset</div>'
+        f'</div>', unsafe_allow_html=True)
 
 with k2:
     outlook = kpi["avg_outlook"]
-    delta_class = "kpi-delta-up" if outlook > 0 else "kpi-delta-down"
-    delta_text  = "Growing market" if outlook > 0 else "Contracting market"
-    st.markdown(f"""
-    <div class='kpi-card'>
-        <div class='kpi-label'>Avg. hiring outlook</div>
-        <div class='kpi-value'>{outlook:+.1f}</div>
-        <div class='{delta_class}'>{delta_text}</div>
-    </div>""", unsafe_allow_html=True)
+    cls  = "kpi-delta-up" if outlook > 0 else "kpi-delta-down"
+    txt  = "Growing market" if outlook > 0 else "Contracting market"
+    st.markdown(
+        f'<div class="kpi-card">'
+        f'<div class="kpi-label">Avg. hiring outlook</div>'
+        f'<div class="kpi-value">{outlook:+.1f}</div>'
+        f'<div class="{cls}">{txt}</div>'
+        f'</div>', unsafe_allow_html=True)
 
 with k3:
-    st.markdown(f"""
-    <div class='kpi-card'>
-        <div class='kpi-label'>Fast-growing roles</div>
-        <div class='kpi-value'>{kpi['fast_growing_count']}</div>
-        <div class='kpi-delta-up'>↑ Growth score &gt; 20</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="kpi-card">'
+        f'<div class="kpi-label">Fast-growing roles</div>'
+        f'<div class="kpi-value">{kpi["fast_growing_count"]}</div>'
+        f'<div class="kpi-delta-up">&#8593; Growth score &gt; 20</div>'
+        f'</div>', unsafe_allow_html=True)
 
 with k4:
-    st.markdown(f"""
-    <div class='kpi-card'>
-        <div class='kpi-label'>Declining roles</div>
-        <div class='kpi-value'>{kpi['declining_count']}</div>
-        <div class='kpi-delta-down'>↓ Growth score &lt; -5</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="kpi-card">'
+        f'<div class="kpi-label">Declining roles</div>'
+        f'<div class="kpi-value">{kpi["declining_count"]}</div>'
+        f'<div class="kpi-delta-down">&#8595; Growth score &lt; -5</div>'
+        f'</div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ===========================================================================
-# OUTLOOK DISTRIBUTION ROW — 3 compact charts
+# OUTLOOK DISTRIBUTION ROW
 # ===========================================================================
 od1, od2, od3 = st.columns(3)
 
 with od1:
-    st.markdown("<div class='section-label'>Outlook distribution · all roles</div>",
+    st.markdown('<div class="section-label">Outlook distribution &middot; all roles</div>',
                 unsafe_allow_html=True)
-    # Stacked horizontal bar showing growth bucket proportions
-    role_stats["color"] = role_stats["growth_score"].apply(growth_color)
-    role_stats["label"] = role_stats["growth_score"].apply(growth_label)
-
-    bucket_counts = role_stats.groupby("label")["job_count"].sum().reset_index()
-    total = bucket_counts["job_count"].sum()
-    bucket_counts["pct"] = (bucket_counts["job_count"] / total * 100).round(1)
+    rs = role_stats.copy()
+    rs["label"] = rs["growth_score"].apply(growth_label)
+    bucket = rs.groupby("label")["job_count"].sum().reset_index()
+    total  = bucket["job_count"].sum()
+    bucket["pct"] = (bucket["job_count"] / total * 100).round(1)
 
     label_order  = ["Very fast growth","Growing","Stable","Slowing","Declining"]
-    label_colors = [COLORS["very_fast"], COLORS["growing"], COLORS["stable"],
-                    COLORS["slowing"],  COLORS["declining"]]
+    label_colors = [C["very_fast"], C["growing"], C["stable"], C["slowing"], C["declining"]]
 
     fig_dist = go.Figure()
     for lbl, clr in zip(label_order, label_colors):
-        row = bucket_counts[bucket_counts["label"] == lbl]
+        row = bucket[bucket["label"] == lbl]
         pct = row["pct"].values[0] if len(row) > 0 else 0
         fig_dist.add_trace(go.Bar(
             x=[pct], y=[""], orientation="h",
             name=lbl, marker_color=clr,
             text=f"{pct:.0f}%", textposition="inside",
-            hovertemplate=f"{lbl}: {pct:.1f}%<extra></extra>"
+            hovertemplate=f"{lbl}: {pct:.1f}%<extra></extra>",
         ))
-
     fig_dist.update_layout(
         barmode="stack", height=60,
-        margin=dict(l=0, r=0, t=0, b=0),
-        showlegend=False,
-        **CHART_BG,
+        margin=dict(l=0,r=0,t=0,b=0),
+        showlegend=False, **CHART_BG,
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
         yaxis=dict(showticklabels=False, showgrid=False),
     )
-    st.plotly_chart(fig_dist, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig_dist, use_container_width=True, config=PLOTLY_CFG)
 
 with od2:
-    st.markdown("<div class='section-label'>Outlook by salary band</div>",
+    st.markdown('<div class="section-label">Outlook by salary band</div>',
                 unsafe_allow_html=True)
     bands = {
-        "20+ LPA" : role_stats[role_stats["salary_median"] >= 20]["job_count"].sum(),
-        "10–20 LPA": role_stats[(role_stats["salary_median"] >= 10) &
+        "20+ LPA"  : role_stats[role_stats["salary_median"] >= 20]["job_count"].sum(),
+        "10-20 LPA": role_stats[(role_stats["salary_median"] >= 10) &
                                 (role_stats["salary_median"] < 20)]["job_count"].sum(),
-        "5–10 LPA" : role_stats[(role_stats["salary_median"] >= 5) &
+        "5-10 LPA" : role_stats[(role_stats["salary_median"] >= 5) &
                                 (role_stats["salary_median"] < 10)]["job_count"].sum(),
         "<5 LPA"   : role_stats[role_stats["salary_median"] < 5]["job_count"].sum(),
     }
@@ -323,11 +389,11 @@ with od2:
         band_df, x="count", y="band", orientation="h",
         color="band",
         color_discrete_map={
-            "20+ LPA"  : COLORS["very_fast"],
-            "10–20 LPA": COLORS["growing"],
-            "5–10 LPA" : COLORS["stable"],
-            "<5 LPA"   : COLORS["declining"],
-        }
+            "20+ LPA"  : C["very_fast"],
+            "10-20 LPA": C["growing"],
+            "5-10 LPA" : C["stable"],
+            "<5 LPA"   : C["declining"],
+        },
     )
     fig_sal.update_layout(
         height=130, margin=dict(l=0,r=0,t=0,b=0),
@@ -335,10 +401,10 @@ with od2:
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
         yaxis=dict(title=""),
     )
-    st.plotly_chart(fig_sal, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig_sal, use_container_width=True, config=PLOTLY_CFG)
 
 with od3:
-    st.markdown("<div class='section-label'>Outlook by education level</div>",
+    st.markdown('<div class="section-label">Outlook by education level</div>',
                 unsafe_allow_html=True)
     edu_df = (
         jobs_df[jobs_df["education"].isin(
@@ -349,13 +415,13 @@ with od3:
         .rename(columns={"job_id":"count"})
     )
     edu_order = ["PhD","Master's","Bachelor's","Diploma","Any"]
-    edu_df["education"] = pd.Categorical(edu_df["education"],
-                                          categories=edu_order, ordered=True)
+    edu_df["education"] = pd.Categorical(
+        edu_df["education"], categories=edu_order, ordered=True
+    )
     edu_df = edu_df.sort_values("education")
-
     fig_edu = px.bar(
         edu_df, x="count", y="education", orientation="h",
-        color_discrete_sequence=[COLORS["growing"]],
+        color_discrete_sequence=[C["growing"]],
     )
     fig_edu.update_layout(
         height=130, margin=dict(l=0,r=0,t=0,b=0),
@@ -363,48 +429,39 @@ with od3:
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
         yaxis=dict(title=""),
     )
-    st.plotly_chart(fig_edu, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig_edu, use_container_width=True, config=PLOTLY_CFG)
 
 
 # ===========================================================================
-# TREEMAP HERO — full width
+# TREEMAP HERO
 # ===========================================================================
-st.markdown("<div class='section-label'>Job roles · rectangle size = openings · "
-            "color = growth rate · hover any role for details</div>",
+st.markdown('<div class="section-label">Job roles &middot; rectangle size = openings '
+            '&middot; color = growth rate &middot; hover any role for details</div>',
             unsafe_allow_html=True)
 
-# Exclude "Other" from treemap — it's too dominant and not informative
 treemap_df = filtered_roles[filtered_roles["job_title_canonical"] != "Other"].copy()
 
 if len(treemap_df) > 0:
     treemap_df["color_val"] = treemap_df["growth_score"]
-    treemap_df["hover_label"] = treemap_df.apply(
-        lambda r: (
-            f"<b>{r['job_title_canonical']}</b><br>"
-            f"Jobs: {int(r['job_count']):,}<br>"
-            f"Growth: {r['growth_score']:+.1f}"
-        ), axis=1
-    )
-
     fig_tree = px.treemap(
         treemap_df,
-        path       = ["job_title_canonical"],
-        values     = "job_count",
-        color      = "color_val",
-        color_continuous_scale = [
-            [0.0,  COLORS["declining"]],
-            [0.25, COLORS["slowing"]],
-            [0.5,  COLORS["stable"]],
-            [0.75, COLORS["growing"]],
-            [1.0,  COLORS["very_fast"]],
+        path   = ["job_title_canonical"],
+        values = "job_count",
+        color  = "color_val",
+        color_continuous_scale=[
+            [0.0,  C["declining"]],
+            [0.25, C["slowing"]],
+            [0.5,  C["stable"]],
+            [0.75, C["growing"]],
+            [1.0,  C["very_fast"]],
         ],
-        custom_data = ["hover_label"],
+        hover_data={"job_count": True, "color_val": ":.1f"},
     )
     fig_tree.update_traces(
-        hovertemplate="%{customdata[0]}<extra></extra>",
         textfont_size=12,
         marker_line_width=1,
         marker_line_color="#0f1117",
+        hovertemplate="<b>%{label}</b><br>Jobs: %{value:,}<br>Growth score: %{color:.1f}<extra></extra>",
     )
     fig_tree.update_layout(
         height=380,
@@ -412,7 +469,7 @@ if len(treemap_df) > 0:
         paper_bgcolor="#161922",
         coloraxis_showscale=False,
     )
-    st.plotly_chart(fig_tree, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig_tree, use_container_width=True, config=PLOTLY_CFG)
 else:
     st.info("No roles match the current filters.")
 
@@ -420,21 +477,18 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ===========================================================================
-# SNAPSHOT ROW — 3 mini charts with explore links
+# SNAPSHOT ROW
 # ===========================================================================
 s1, s2, s3 = st.columns(3)
 
 with s1:
-    st.markdown("<div class='section-label'>Top skills by demand</div>",
+    st.markdown('<div class="section-label">Top skills by demand</div>',
                 unsafe_allow_html=True)
-    top_skills = skill_stats.head(8).copy()
-    top_skills["color"] = top_skills["growth_score"].apply(growth_color)
-
+    top_sk = skill_stats.head(8).copy()
+    top_sk["color"] = top_sk["growth_score"].apply(growth_color)
     fig_sk = px.bar(
-        top_skills, x="job_count", y="skill",
-        orientation="h",
-        color="color",
-        color_discrete_map="identity",
+        top_sk, x="job_count", y="skill", orientation="h",
+        color="color", color_discrete_map="identity",
     )
     fig_sk.update_layout(
         height=240, margin=dict(l=0,r=0,t=0,b=0),
@@ -442,21 +496,18 @@ with s1:
         yaxis=dict(autorange="reversed", title=""),
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
     )
-    st.plotly_chart(fig_sk, use_container_width=True, config=PLOTLY_CONFIG)
-    st.markdown("<div class='explore-link'>→ explore skills page</div>",
+    st.plotly_chart(fig_sk, use_container_width=True, config=PLOTLY_CFG)
+    st.markdown('<div class="explore-link">explore skills page &rarr;</div>',
                 unsafe_allow_html=True)
 
 with s2:
-    st.markdown("<div class='section-label'>Hiring demand by city</div>",
+    st.markdown('<div class="section-label">Hiring demand by city</div>',
                 unsafe_allow_html=True)
-    top_cities = city_stats.head(8).copy()
-    top_cities["color"] = top_cities["growth_score"].apply(growth_color)
-
+    top_ct = city_stats.head(8).copy()
+    top_ct["color"] = top_ct["growth_score"].apply(growth_color)
     fig_ct = px.bar(
-        top_cities, x="job_count", y="city",
-        orientation="h",
-        color="color",
-        color_discrete_map="identity",
+        top_ct, x="job_count", y="city", orientation="h",
+        color="color", color_discrete_map="identity",
     )
     fig_ct.update_layout(
         height=240, margin=dict(l=0,r=0,t=0,b=0),
@@ -464,27 +515,27 @@ with s2:
         yaxis=dict(autorange="reversed", title=""),
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
     )
-    st.plotly_chart(fig_ct, use_container_width=True, config=PLOTLY_CONFIG)
-    st.markdown("<div class='explore-link'>→ explore cities page</div>",
+    st.plotly_chart(fig_ct, use_container_width=True, config=PLOTLY_CFG)
+    st.markdown('<div class="explore-link">explore cities page &rarr;</div>',
                 unsafe_allow_html=True)
 
 with s3:
-    st.markdown("<div class='section-label'>Salary snapshot (median LPA)</div>",
+    st.markdown('<div class="section-label">Salary snapshot (median LPA)</div>',
                 unsafe_allow_html=True)
     sal_df = (
-        role_stats[role_stats["salary_median"].notna()]
-        [role_stats["job_title_canonical"] != "Other"]
+        role_stats[
+            role_stats["salary_median"].notna() &
+            (role_stats["job_title_canonical"] != "Other")
+        ]
         .nlargest(8, "salary_median")
         [["job_title_canonical","salary_median","growth_score"]]
         .copy()
     )
     sal_df["color"] = sal_df["growth_score"].apply(growth_color)
-
     fig_sal2 = px.bar(
         sal_df, x="salary_median", y="job_title_canonical",
         orientation="h",
-        color="color",
-        color_discrete_map="identity",
+        color="color", color_discrete_map="identity",
     )
     fig_sal2.update_layout(
         height=240, margin=dict(l=0,r=0,t=0,b=0),
@@ -492,6 +543,6 @@ with s3:
         yaxis=dict(autorange="reversed", title=""),
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
     )
-    st.plotly_chart(fig_sal2, use_container_width=True, config=PLOTLY_CONFIG)
-    st.markdown("<div class='explore-link'>→ explore salary page</div>",
+    st.plotly_chart(fig_sal2, use_container_width=True, config=PLOTLY_CFG)
+    st.markdown('<div class="explore-link">explore salary page &rarr;</div>',
                 unsafe_allow_html=True)
