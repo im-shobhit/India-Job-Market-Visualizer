@@ -1,0 +1,9 @@
+[[pages]]
+path = "app.py"
+name = "Overview"
+icon = "house"
+
+[[pages]]
+path = "pages/1_skills.py"
+name = "Skills"
+icon = "bar-chart"
