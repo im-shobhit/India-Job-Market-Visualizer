@@ -143,8 +143,9 @@ with st.sidebar:
         '</div>',
         unsafe_allow_html=True,
     )
-    st.page_link("app.py",             label="Overview", icon="🏠")
-    st.page_link("pages/1_skills.py",  label="Skills",   icon="📊")
+    st.page_link("app.py",                    label="Overview",       icon="🏠")
+    st.page_link("pages/1_skills.py",         label="Skills",         icon="📊")
+    st.page_link("pages/2_career_advisor.py", label="Career Advisor", icon="🤖")
     st.markdown("---")
     st.markdown("### Filters")
     sel_city     = st.selectbox("City",       filter_opts["cities"])
