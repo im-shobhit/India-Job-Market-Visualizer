@@ -19,7 +19,7 @@ data/raw/
 data/processed/
 
 # Database file — binary, not suitable for Git
-data/*.db
+# data/*.db
 data/*.sqlite
 
 # Trained ML models — large binary files
